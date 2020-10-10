@@ -1,12 +1,14 @@
 # Easy paver commands for less command typing and more coding.
 # Visit http://paver.github.com/paver/ to get started. - @brandondean Sept. 30
 import subprocess
+import sys
 import json
 import time
 import optparse
 import os
 import re
 from paver.easy import *
+from openapi_spec_validator import validate_spec
 
 path = path("./")
 
@@ -88,6 +90,29 @@ def lint(options):
 
 
 @task
+def validate_swagger():
+    dir = "./static/swagger"
+    for fname in os.listdir(dir):
+        print("Checking {}...".format(fname))
+        if fname.endswith(".json"):
+            with open('{}/{}'.format(dir, fname), 'rb') as file:
+                try:
+                    spec_dict = json.load(file)
+                except ValueError, e:
+                    print("Invalid JSON")
+                    print(e)
+                    sys.exit(1)
+            try:
+                validate_spec(spec_dict)
+            except Exception, e:
+                print("Invalid OpenAPI Spec")
+                print(e)
+                sys.exit(1)
+            print("{} validated!".format(fname))
+    sys.exit(0)
+
+
+@task
 def make():
     javascript()
     gulp()
@@ -115,6 +140,7 @@ def make():
 @task
 def make_endpoints_config():
     sh("python lib/endpoints/endpointscfg.py get_openapi_spec mobile_main.MobileAPI --hostname tbatv-prod-hrd.appspot.com")
+    sh("python lib/endpoints/endpointscfg.py get_openapi_spec clientapi.clientapi_service.ClientAPI --hostname tbatv-prod-hrd.appspot.com")
 
 
 @task
@@ -128,13 +154,7 @@ def preflight():
 @task
 def run():
     """Run local dev server"""
-    sh("dev_appserver.py dispatch.yaml app.yaml app-backend-tasks.yaml app-backend-tasks-b2.yaml api.yaml clientapi.yaml tasks.yaml tbans.yaml")
-
-
-@task
-def run_tbans():
-    """Run local TBANS dev server"""
-    sh("dev_appserver.py tbans.yaml")
+    sh("dev_appserver.py dispatch.yaml app.yaml app-backend-tasks.yaml app-backend-tasks-b2.yaml api.yaml clientapi.yaml tasks.yaml")
 
 
 @task
@@ -202,7 +222,7 @@ def bootstrap(options):
 
 @task
 def devserver():
-    sh("dev_appserver.py --skip_sdk_update_check=true --admin_host=0.0.0.0 --host=0.0.0.0 --datastore_path=/datastore/tba.db dispatch.yaml app.yaml app-backend-tasks.yaml app-backend-tasks-b2.yaml api.yaml clientapi.yaml tasks.yaml tbans.yaml")
+    sh("dev_appserver.py --skip_sdk_update_check=true --admin_host=0.0.0.0 --host=0.0.0.0 --datastore_path=/datastore/tba.db dispatch.yaml app.yaml app-backend-tasks.yaml app-backend-tasks-b2.yaml api.yaml clientapi.yaml tasks.yaml")
 
 
 def test_function(args):

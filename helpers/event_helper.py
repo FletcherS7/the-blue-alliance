@@ -182,18 +182,14 @@ class EventHelper(object):
 
         # Make sure all events to be returned are within range
         two_weeks_of_events_keys_future = Event.query().filter(
-          Event.start_date >= (today - datetime.timedelta(days=7))).filter(
-          Event.start_date <= (today + datetime.timedelta(days=7))).order(
+          Event.start_date >= (today - datetime.timedelta(weeks=1))).filter(
+          Event.start_date <= (today + datetime.timedelta(weeks=1))).order(
           Event.start_date).fetch_async(keys_only=True)
 
         events = []
 
-        days_diff = 0
-        # Before 2020, event weeks start on Wednesdays
-        if today.year < 2020:
-            days_diff = 2  # 2 is Wednesday. diff_from_week_start ranges from 3 to -3 (Monday thru Sunday)
-        diff_from_week_start = days_diff - today.weekday()
-        closest_wednesday = today + datetime.timedelta(days=diff_from_week_start)
+        diff_from_week_start = 0 - today.weekday()
+        closest_start_monday = today + datetime.timedelta(days=diff_from_week_start)
 
         two_weeks_of_event_futures = ndb.get_multi_async(two_weeks_of_events_keys_future.get_result())
         for event_future in two_weeks_of_event_futures:
@@ -201,8 +197,8 @@ class EventHelper(object):
             if event.within_a_day:
                 events.append(event)
             else:
-                offset = event.start_date.date() - closest_wednesday.date()
-                if (offset == datetime.timedelta(0)) or (offset > datetime.timedelta(0) and offset < datetime.timedelta(4)):
+                offset = event.start_date.date() - closest_start_monday.date()
+                if (offset == datetime.timedelta(0)) or (offset > datetime.timedelta(0) and offset < datetime.timedelta(weeks=1)):
                     events.append(event)
 
         EventHelper.sort_events(events)
@@ -236,8 +232,14 @@ class EventHelper(object):
                 codes.add('FMA')
             if 'TX' in codes:  # TX and FIT used interchangeably
                 codes.add('FIT')
+            if 'IN' in codes:  # IN and FIN used interchangeably
+                codes.add('FIN')
             district_keys = '|'.join(codes)
         memcache.set('EventHelper.getShortName():district_keys', district_keys, 60*60)
+
+        # Account for 2020 suspensions
+        if name_str.startswith("***SUSPENDED***"):
+            name_str = name_str.replace("***SUSPENDED***", "")
 
         # 2015+ districts
         # Numbered events with no name

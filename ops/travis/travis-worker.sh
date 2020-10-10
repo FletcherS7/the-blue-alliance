@@ -28,7 +28,7 @@ case "$1" in
 
         # Lint swagger files
         echo "Linting swagger specs..."
-        find $(pwd)/static/swagger -type f -name "*.json" | xargs -n 1 openapi-spec-validator
+        paver validate_swagger
 
         # Test we can generate our mobile API configuration - needed for deploys
         echo "Verifying our endpoints configuration..."
@@ -41,6 +41,10 @@ case "$1" in
     "JSUNIT")
         echo "Running javascript tests"
         npm test
+        ;;
+    "MAKE")
+        echo "Running make"
+        paver make
         ;;
     *)
         echo "Unknown job type $JOB"

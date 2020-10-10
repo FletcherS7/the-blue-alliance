@@ -9,6 +9,7 @@ from helpers.cache_clearer import CacheClearer
 from helpers.firebase.firebase_pusher import FirebasePusher
 from helpers.notification_helper import NotificationHelper
 from helpers.manipulator_base import ManipulatorBase
+from helpers.tbans_helper import TBANSHelper
 
 
 class MatchManipulator(ManipulatorBase):
@@ -51,6 +52,11 @@ class MatchManipulator(ManipulatorBase):
                         except Exception, exception:
                             logging.error("Error sending match updates: {}".format(exception))
                             logging.error(traceback.format_exc())
+                        try:
+                            TBANSHelper.match_score(match)
+                        except Exception, exception:
+                            logging.error("Error sending match {} updates: {}".format(match.key_name, exception))
+                            logging.error(traceback.format_exc())
                 else:
                     if is_new or (set(['alliances_json', 'time', 'time_string']).intersection(set(updated_attrs)) != set()):
                         # The match has not been played and we're changing a property that affects the event's schedule
@@ -65,6 +71,11 @@ class MatchManipulator(ManipulatorBase):
                 except Exception, exception:
                     logging.error("Error sending match video updates: {}".format(exception))
                     logging.error(traceback.format_exc())
+                try:
+                    TBANSHelper.match_video(match)
+                except Exception, exception:
+                    logging.error("Error sending match video updates: {}".format(exception))
+                    logging.error(traceback.format_exc())
 
         '''
         If we have an unplayed match during an event within a day, send out a schedule update notification
@@ -75,6 +86,17 @@ class MatchManipulator(ManipulatorBase):
                 NotificationHelper.send_schedule_update(event)
             except Exception, exception:
                 logging.error("Eror sending schedule updates for: {}".format(event.key_name))
+            try:
+                TBANSHelper.event_schedule(event)
+            except Exception, exception:
+                logging.error("Eror sending schedule updates for: {}".format(event.key_name))
+                logging.error(traceback.format_exc())
+            try:
+                # When an event gets a new schedule, we should schedule `match_upcoming` notifications for the first matches for the event
+                TBANSHelper.schedule_upcoming_matches(event)
+            except Exception, exception:
+                logging.error("Eror scheduling match_upcoming for: {}".format(event.key_name))
+                logging.error(traceback.format_exc())
 
         '''
         Enqueue firebase push

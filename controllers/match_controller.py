@@ -5,6 +5,7 @@ from base_controller import CacheableHandler
 from database.gdcv_data_query import MatchGdcvDataQuery
 from models.event import Event
 from models.match import Match
+from models.zebra_motionworks import ZebraMotionWorks
 from template_engine import jinja2_engine
 
 
@@ -16,7 +17,7 @@ class MatchDetail(CacheableHandler):
     SHORT_CACHE_EXPIRATION = 61
     CACHE_VERSION = 4
     CACHE_KEY_FORMAT = "match_detail_{}"  # (match_key)
-    VALID_BREAKDOWN_YEARS = set([2015, 2016, 2017, 2018, 2019])
+    VALID_BREAKDOWN_YEARS = set([2015, 2016, 2017, 2018, 2019, 2020])
 
     def __init__(self, *args, **kw):
         super(MatchDetail, self).__init__(*args, **kw)
@@ -41,6 +42,7 @@ class MatchDetail(CacheableHandler):
         if not match:
             self.abort(404)
 
+        zebra_data = ZebraMotionWorks.get_by_id(match_key)
         gdcv_data = MatchGdcvDataQuery(match_key).fetch()
         timeseries_data = None
         if gdcv_data and len(gdcv_data) >= 147 and len(gdcv_data) <= 150:  # Santiy checks on data
@@ -55,6 +57,7 @@ class MatchDetail(CacheableHandler):
             "match": match,
             "match_breakdown_template": match_breakdown_template,
             "timeseries_data": timeseries_data,
+            "zebra_data": json.dumps(zebra_data.data) if zebra_data else None,
         })
 
         if event.within_a_day:

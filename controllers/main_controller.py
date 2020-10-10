@@ -60,7 +60,7 @@ class AvatarsHandler(CacheableHandler):
 
     def get(self, year):
         year = int(year)
-        if year not in {2018, 2019}:
+        if year not in {2018, 2019, 2020}:
             self.abort(404)
 
         self._partial_cache_key = self.CACHE_KEY_FORMAT.format(year)
@@ -124,12 +124,13 @@ class MainKickoffHandler(CacheableHandler):
 
     def _render(self, *args, **kw):
         special_webcasts = FirebasePusher.get_special_webcasts()
+        effective_season_year = SeasonHelper.effective_season_year()
 
         self.template_values.update({
             'events': EventHelper.getWeekEvents(),
-            'is_kickoff': SeasonHelper.is_kickoff_at_least_one_day_away(),
-            'kickoff_datetime_est': SeasonHelper.kickoff_datetime_est(),
-            'kickoff_datetime_utc': SeasonHelper.kickoff_datetime_utc(),
+            'is_kickoff': SeasonHelper.is_kickoff_at_least_one_day_away(year=effective_season_year),
+            'kickoff_datetime_est': SeasonHelper.kickoff_datetime_est(effective_season_year),
+            'kickoff_datetime_utc': SeasonHelper.kickoff_datetime_utc(effective_season_year),
             "any_webcast_online": any(w.get('status') == 'online' for w in special_webcasts),
             "special_webcasts": special_webcasts,
         })
@@ -146,10 +147,14 @@ class MainBuildseasonHandler(CacheableHandler):
         self._cache_expiration = 60 * 5
 
     def _render(self, *args, **kw):
+        effective_season_year = SeasonHelper.effective_season_year()
+        special_webcasts = FirebasePusher.get_special_webcasts()
+
         self.template_values.update({
-            'endbuild_datetime_est': SeasonHelper.stop_build_datetime_est(),
-            'endbuild_datetime_utc': SeasonHelper.stop_build_datetime_utc(),
+            'seasonstart_datetime_utc': SeasonHelper.first_event_datetime_utc(effective_season_year),
             'events': EventHelper.getWeekEvents(),
+            "any_webcast_online": any(w.get('status') == 'online' for w in special_webcasts),
+            "special_webcasts": special_webcasts,
         })
 
         return jinja2_engine.render('index/index_buildseason.html', self.template_values)
@@ -262,10 +267,11 @@ class MainOffseasonHandler(CacheableHandler):
 
     def _render(self, *args, **kw):
         special_webcasts = FirebasePusher.get_special_webcasts()
+        effective_season_year = SeasonHelper.effective_season_year()
 
         self.template_values.update({
             "events": EventHelper.getWeekEvents(),
-            'kickoff_datetime_utc': SeasonHelper.kickoff_datetime_utc(),
+            'kickoff_datetime_utc': SeasonHelper.kickoff_datetime_utc(effective_season_year),
             "any_webcast_online": any(w.get('status') == 'online' for w in special_webcasts),
             "special_webcasts": special_webcasts,
         })
@@ -476,18 +482,6 @@ class WebcastsHandler(CacheableHandler):
         return jinja2_engine.render('webcasts.html', self.template_values)
 
 
-class RecordHandler(CacheableHandler):
-    CACHE_VERSION = 1
-    CACHE_KEY_FORMAT = "main_record"
-
-    def __init__(self, *args, **kw):
-        super(RecordHandler, self).__init__(*args, **kw)
-        self._cache_expiration = 60 * 60 * 24 * 7
-
-    def _render(self, *args, **kw):
-        return jinja2_engine.render('record.html', self.template_values)
-
-
 class ApiWriteHandler(CacheableHandler):
     CACHE_VERSION = 1
     CACHE_KEY_FORMAT = "api_write"
@@ -498,3 +492,15 @@ class ApiWriteHandler(CacheableHandler):
 
     def _render(self, *args, **kw):
         return jinja2_engine.render('apiwrite.html', self.template_values)
+
+
+class BrandHandler(CacheableHandler):
+    CACHE_VERSION = 1
+    CACHE_KEY_FORMAT = "main_brand"
+
+    def __init__(self, *args, **kw):
+        super(BrandHandler, self).__init__(*args, **kw)
+        self._cache_expiration = 60 * 60 * 24 * 7
+
+    def _render(self, *args, **kw):
+        return jinja2_engine.render('brand.html', self.template_values)

@@ -1,16 +1,12 @@
-from google.appengine.ext import ndb
-from google.appengine.ext.ndb.tasklets import Future
-
-import datetime
-import json
-import re
+import datetime, json, re
 
 from consts.playoff_type import PlayoffType
 from consts.district_type import DistrictType
 from consts.event_type import EventType
-from context_cache import context_cache
-from helpers.location_helper import LocationHelper
-from helpers.webcast_online_helper import WebcastOnlineHelper
+
+from google.appengine.ext import ndb
+from google.appengine.ext.ndb.tasklets import Future
+
 from models.district import District
 from models.event_details import EventDetails
 from models.location import Location
@@ -23,8 +19,8 @@ class Event(ndb.Model):
     """
     name = ndb.StringProperty()
     event_type_enum = ndb.IntegerProperty(required=True)
-    short_name = ndb.StringProperty(indexed=False)  # Should not contain "Regional" or "Division", like "Hartford"
-    event_short = ndb.StringProperty(required=True, indexed=False)  # Smaller abbreviation like "CT"
+    short_name = ndb.TextProperty(indexed=False)  # Should not contain "Regional" or "Division", like "Hartford"
+    event_short = ndb.TextProperty(required=True, indexed=False)  # Smaller abbreviation like "CT"
     first_code = ndb.StringProperty()  # Event code used in FIRST's API, if different from event_short
     year = ndb.IntegerProperty(required=True)
     event_district_enum = ndb.IntegerProperty(default=DistrictType.NO_DISTRICT)  # Deprecated, use district_key instead
@@ -34,8 +30,8 @@ class Event(ndb.Model):
     playoff_type = ndb.IntegerProperty()
 
     # venue, venue_addresss, city, state_prov, country, and postalcode are from FIRST
-    venue = ndb.StringProperty(indexed=False)  # Name of the event venue
-    venue_address = ndb.StringProperty(indexed=False)  # Most detailed venue address (includes venue, street, and location separated by \n)
+    venue = ndb.TextProperty(indexed=False)  # Name of the event venue
+    venue_address = ndb.TextProperty(indexed=False)  # Most detailed venue address (includes venue, street, and location separated by \n)
     city = ndb.StringProperty()  # Equivalent to locality. From FRCAPI
     state_prov = ndb.StringProperty()  # Equivalent to region. From FRCAPI
     country = ndb.StringProperty()  # From FRCAPI
@@ -48,9 +44,9 @@ class Event(ndb.Model):
     first_eid = ndb.StringProperty()  # from USFIRST
     parent_event = ndb.KeyProperty()  # This is the division -> event champs relationship
     divisions = ndb.KeyProperty(repeated=True)  # event champs -> all divisions
-    facebook_eid = ndb.StringProperty(indexed=False)  # from Facebook
-    custom_hashtag = ndb.StringProperty(indexed=False)  # Custom HashTag
-    website = ndb.StringProperty(indexed=False)
+    facebook_eid = ndb.TextProperty(indexed=False)  # from Facebook
+    custom_hashtag = ndb.TextProperty(indexed=False)  # Custom HashTag
+    website = ndb.TextProperty(indexed=False)
     webcast_json = ndb.TextProperty(indexed=False)  # list of dicts, valid keys include 'type' and 'channel'
     enable_predictions = ndb.BooleanProperty(default=False)
     remap_teams = ndb.JsonProperty()  # Map of temporary team numbers to pre-rookie and B teams
@@ -230,10 +226,15 @@ class Event(ndb.Model):
         if self.event_type_enum not in EventType.NON_CMP_EVENT_TYPES or not self.official:
             return None
 
+        if self._week:
+            return self._week
+
         # Cache week_start for the same context
-        cache_key = '{}_week_start:{}'.format(self.year, ndb.get_context().__hash__())
-        week_start = context_cache.get(cache_key)
-        if week_start is None:
+        from context_cache import context_cache
+        cache_key = '{}_season_start:{}'.format(self.year, ndb.get_context().__hash__())
+        season_start = context_cache.get(cache_key)
+
+        if season_start is None:
             e = Event.query(
                 Event.year==self.year,
                 Event.event_type_enum.IN(EventType.NON_CMP_EVENT_TYPES),
@@ -243,17 +244,22 @@ class Event(ndb.Model):
                 first_start_date = e[0].start_date
 
                 days_diff = 0
-                # Before 2020, event weeks start on Wednesdays
-                if self.year < 2020:
+                # Before 2018, event weeks start on Wednesdays
+                if self.year < 2018:
                     days_diff = 2  # 2 is Wednesday
-                diff_from_week_start = (first_start_date.weekday() - days_diff) % 7
-                week_start = first_start_date - datetime.timedelta(days=diff_from_week_start)
-            else:
-                week_start = None
-        context_cache.set(cache_key, week_start)
 
-        if self._week is None and week_start is not None:
-            days = (self.start_date - week_start).days
+                # Find the closest start weekday (Monday or Wednesday) to the first event - this is our season start
+                diff_from_week_start = (first_start_date.weekday() - days_diff) % 7
+                diff_from_week_start = min([diff_from_week_start, diff_from_week_start - 7], key=abs)
+
+                season_start = first_start_date - datetime.timedelta(days=diff_from_week_start)
+            else:
+                season_start = None
+        context_cache.set(cache_key, season_start)
+
+        if self._week is None and season_start is not None:
+            # Round events that occur just before the official start-of-season to the closest week
+            days = max((self.start_date - season_start).days, 0)
             self._week = days / 7
 
         return self._week
@@ -378,13 +384,18 @@ class Event(ndb.Model):
         if self._webcast is None:
             try:
                 self._webcast = json.loads(self.webcast_json)
+
+                # Sort firstinspires channels to the front, keep the order of the rest
+                self._webcast = sorted(self._webcast, key=lambda w: 0 if (w['type'] == 'twitch' and w['channel'].startswith('firstinspires')) else 1)
             except Exception, e:
                 self._webcast = None
         return self._webcast
 
     @property
     def webcast_status(self):
+        from helpers.webcast_online_helper import WebcastOnlineHelper
         WebcastOnlineHelper.add_online_status(self.current_webcasts)
+
         overall_status = 'offline'
         for webcast in self.current_webcasts:
             status = webcast.get('status')
@@ -414,7 +425,10 @@ class Event(ndb.Model):
     @property
     def online_webcasts(self):
         current_webcasts = self.current_webcasts
+
+        from helpers.webcast_online_helper import WebcastOnlineHelper
         WebcastOnlineHelper.add_online_status(current_webcasts)
+
         return filter(lambda x: x.get('status', '') != 'offline', current_webcasts if current_webcasts else [])
 
     @property
@@ -468,7 +482,7 @@ class Event(ndb.Model):
             return "frc" + self.event_short
 
     # Depreciated, still here to keep GAE clean.
-    webcast_url = ndb.StringProperty(indexed=False)
+    webcast_url = ndb.TextProperty(indexed=False)
 
     @classmethod
     def validate_key_name(self, event_key):
@@ -558,3 +572,13 @@ class Event(ndb.Model):
             return recent_matches[0]
         else:
             return None
+
+    def team_awards(self):
+        # Returns a dictionary of awards for teams
+        team_awards = {}  # Key is a Team key, value is an array of Awards that team won
+        for award in self.awards:
+            for team_key in award.team_list:
+                a = team_awards.get(team_key, [])
+                a.append(award)
+                team_awards[team_key] = a
+        return team_awards

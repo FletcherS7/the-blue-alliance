@@ -1,4 +1,15 @@
 dispatch:
+# Python 3 Migration
+- url: "py3.thebluealliance.com/api/*"
+  service: py3-api
+
+- url: "py3.thebluealliance.com/*"
+  service: py3-web
+  
+# Start serving certain pages from py3
+- url: "www.thebluealliance.com/"  # Just the homepage
+  service: py3-web
+
 # Beta PWA
 - url: "beta.thebluealliance.com/*"
   service: pwa-ssr
@@ -17,16 +28,12 @@ dispatch:
   service: backend-tasks-b2
 
 # Endpoints for internal client API
-# - url: "*/clientapi/*"
-#   service: clientapi
+- url: "*/clientapi/*"
+  service: clientapi
 
 # Handles latency-insensive tasks
-# - url: "*/tasks/*"
-#   service: tasks
-
-# Send notification requests to TBANS (The Blue Alliance Notification Service)
-- url: "*/tbans/*"
-  service: tbans
+- url: "*/tasks/*"
+  service: tasks
 
 # Send everything else to default module
 - url: "*/"

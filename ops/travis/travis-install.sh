@@ -13,6 +13,7 @@ else
     check_clowntown_tag
 fi
 
+bash -c "source ~/.nvm/nvm.sh; nvm install $NODE_JS_VERSION; nvm install 8.16.0"
 pip install -r travis_requirements.txt
 paver install_libs
 GAE_VERSION="1.9.66"
@@ -20,5 +21,5 @@ wget https://storage.googleapis.com/appengine-sdks/featured/google_appengine_$GA
 unzip -q google_appengine_$GAE_VERSION.zip -d $HOME
 rm google_appengine_$GAE_VERSION.zip
 npm install
-npm install -g gulp-cli uglify-es uglifycss less request
+npm install -g gulp-cli uglify-es uglifycss less request tslib
 npm ls || true

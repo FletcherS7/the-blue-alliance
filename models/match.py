@@ -3,7 +3,6 @@ import json
 import datetime
 import re
 
-import time
 from google.appengine.ext import ndb
 
 from consts.event_type import EventType
@@ -46,7 +45,7 @@ class Match(ndb.Model):
         'f': 5,
     }
 
-    alliances_json = ndb.StringProperty(required=True, indexed=False)  # JSON dictionary with alliances and scores.
+    alliances_json = ndb.TextProperty(required=True, indexed=False)  # JSON dictionary with alliances and scores.
 
     # {
     #   "red": {
@@ -63,7 +62,7 @@ class Match(ndb.Model):
     #   }
     # }
 
-    score_breakdown_json = ndb.StringProperty(indexed=False)  # JSON dictionary with score breakdowns. Fields are those used for seeding. Varies by year.
+    score_breakdown_json = ndb.TextProperty(indexed=False)  # JSON dictionary with score breakdowns. Fields are those used for seeding. Varies by year.
     # Example for 2014. Seeding outlined in Section 5.3.4 in the 2014 manual.
     # {"red": {
     #     "auto": 20,
@@ -86,7 +85,7 @@ class Match(ndb.Model):
     set_number = ndb.IntegerProperty(required=True, indexed=False)
     team_key_names = ndb.StringProperty(repeated=True)  # list of teams in Match, for indexing.
     time = ndb.DateTimeProperty()  # UTC time of scheduled start
-    time_string = ndb.StringProperty(indexed=False)  # the time as displayed on FIRST's site (event's local time)
+    time_string = ndb.TextProperty(indexed=False)  # the time as displayed on FIRST's site (event's local time)
     actual_time = ndb.DateTimeProperty()  # UTC time of match actual start
     predicted_time = ndb.DateTimeProperty()  # UTC time of when we predict the match will start
     post_result_time = ndb.DateTimeProperty()  # UTC time scores were shown to the audience
@@ -148,10 +147,13 @@ class Match(ndb.Model):
         Lazy load score_breakdown_json
         """
         if self._score_breakdown is None and self.score_breakdown_json is not None:
-            self._score_breakdown = json.loads(self.score_breakdown_json)
+            try:
+                self._score_breakdown = json.loads(self.score_breakdown_json)
+            except:
+                return None
 
-            # Add in RP calculations
             if self.has_been_played:
+                # Add in RP calculations
                 if self.year in {2016, 2017}:
                     for color in ['red', 'blue']:
                         if self.comp_level == 'qm':
@@ -174,6 +176,11 @@ class Match(ndb.Model):
                             self._score_breakdown[color]['tba_rpEarned'] = rp_earned
                         else:
                             self._score_breakdown[color]['tba_rpEarned'] = None
+                # Derive if bonus RP came from fouls
+                if self.year == 2020:
+                    for color in ['red', 'blue']:
+                        self._score_breakdown[color]['tba_shieldEnergizedRankingPointFromFoul'] = self._score_breakdown[color]['shieldEnergizedRankingPoint'] and not self._score_breakdown[color]['stage3Activated']
+                        self._score_breakdown[color]['tba_numRobotsHanging'] = sum([1 if self._score_breakdown[color].get('endgameRobot{}'.format(i)) == 'Hang' else 0 for i in range(1, 4)])
 
         return self._score_breakdown
 

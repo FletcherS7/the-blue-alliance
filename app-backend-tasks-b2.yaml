@@ -22,8 +22,13 @@ libraries:
   version: "2016.4"
 - name: MySQLdb
   version: "latest"
+- name: grpcio
+  version: 1.0.0
 
 handlers:
+- url: /backend-tasks-b2/console/.*
+  script: google.appengine.ext.admin.application
+  login: admin
 - url: /_ah/queue/deferred.*
   script: google.appengine.ext.deferred.deferred.application
   login: admin

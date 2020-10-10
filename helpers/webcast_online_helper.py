@@ -27,10 +27,14 @@ class WebcastOnlineHelper(object):
                 webcast['status'] = cached_webcast['status']
             if 'stream_title' in cached_webcast:
                 webcast['stream_title'] = cached_webcast['stream_title']
+            if 'viewer_count' in cached_webcast:
+                webcast['viewer_count'] = cached_webcast['viewer_count']
+
             return
 
         webcast['status'] = 'unknown'
         webcast['stream_title'] = None
+        webcast['viewer_count'] = None
         if not tba_config.CONFIG['update-webcast-online-status']:
             return
         if webcast['type'] == 'twitch':
@@ -70,7 +74,8 @@ class WebcastOnlineHelper(object):
             response = json.loads(result.content)
             if response['data']:
                 webcast['status'] = 'online'
-                webcast['stream_title'] = response['stream']['channel']['status']
+                webcast['stream_title'] = response['data'][0]['title']
+                webcast['viewer_count'] = response['data'][0]['viewer_count']
             else:
                 webcast['status'] = 'offline'
         else:

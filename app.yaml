@@ -28,6 +28,8 @@ libraries:
   version: "2016.4"
 - name: MySQLdb
   version: "latest"
+- name: grpcio
+  version: 1.0.0
 
 handlers:
 - url: /css
@@ -64,6 +66,9 @@ handlers:
   static_files: static/manifest.json
   upload: static/manifest.json
   expiration: "1d"
+- url: /.well-known
+  static_dir: static/well-known
+  mime_type: application/json
 
 - url: /tasks/.* # Here to take care of requests until new dispatch.yaml kicks in
   script: cron_main.app
@@ -85,6 +90,20 @@ handlers:
   login: admin
 - url: /clientapi/.*
   script: clientapi.clientapi_service.app
+
+# These are duplicates of other modules, but are handy to run the
+# entire site on fewer GAE instances; dispatch.yaml will override this
+# if it is deployed
+- url: /backend-tasks/.*
+  script: backend_main.app
+  login: admin
+- url: /backend-tasks-b2/.*
+  script: backend_main_b2.app
+  login: admin
+- url: /tasks/.*
+  script: cron_main.app
+  login: admin
+
 - url: .*
   script: main.app
 

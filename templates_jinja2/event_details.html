@@ -88,6 +88,7 @@
         {% if event.website %}<br><span class="glyphicon glyphicon-link"></span> <a href="{{ event.website }}" title="{{ event.name }}" target="_blank">{{ event.website }}</a>{% endif %}
         {% if event.first_eid or event.official %}{% if not event.website %}<br><span class="glyphicon glyphicon-info-sign"></span>{% else %} - {% endif %} details on <a href="{% if event.first_eid %}https://www.firstinspires.org/team-event-search/event?id={{event.first_eid}}{%elif event.official %}https://frc-events.firstinspires.org/{{event.year}}/{{event.first_api_code}}{%endif%}" target="_blank">firstinspires.org</a>{% endif %}
         {% if event.facebook_eid %}<br><span class="glyphicon glyphicon-thumbs-up"></span> <a href="{{ event.facebook_event_url }}" title="Facebook Event" target="_blank">RSVP on Facebook</a><br>{% endif %}
+        {% if event.official and event.year >= 2006 %}<br><span class="glyphicon glyphicon-info-sign"></span> Data provided by the <a href="https://frc-events.firstinspires.org/services/API" target="_blank">FIRST Events API</a>{% endif %}
       </p>
     </div>
   </div>
@@ -207,7 +208,7 @@
       </div>
       <div class="row">
         <div class="col-sm-12">
-          {% if has_time_predictions %}<p>Match times listed with a <em>*</em> are unofficial predicted times computed by The Blue Alliance for your convenience.</p>{% endif %}
+          {% if has_time_predictions %}<p>Match times listed with a <em>*</em> are unofficial predicted times in your timezone computed by The Blue Alliance for your convenience.</p>{% endif %}
           <p><a class="btn btn-default" href="/suggest/event/video?event_key={{event.key_name}}"><span class="glyphicon glyphicon-upload"></span> Tell us about YouTube videos</a></p>
           <p><a class="btn btn-default" href="/event/{{ event.key_name }}/feed"><span class="glyphicon glyphicon-barcode"></span> Matches in RSS</a></p>
         </div>

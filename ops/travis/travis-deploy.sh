@@ -8,10 +8,10 @@ export BOTO_CONFIG=/dev/null # Hack to fix https://github.com/travis-ci/travis-c
 # Basically an implementation of:
 # https://github.com/travis-ci/dpl/blob/master/lib/dpl/provider/gae.rb
 
-KEYFILE=ops/tbatv-prod-hrd-deploy.json
-PROJECT=tbatv-prod-hrd
+KEYFILE=ops/$GAE_PROJECT_ID-deploy.json
+PROJECT=$GAE_PROJECT_ID
 VERSION=prod-2
-DEPLOY_LOCK=tbatv-prod-hrd-deploy-lock
+DEPLOY_LOCK=$PROJECT-deploy-lock
 
 BASE='https://dl.google.com/dl/cloudsdk/channels/rapid/'
 NAME='google-cloud-sdk'
@@ -22,6 +22,49 @@ GCLOUD="$INSTALL/$NAME/bin/gcloud"
 
 with_python27() {
     bash -c "source $HOME/virtualenv/python2.7/bin/activate; $1"
+}
+
+deploy_module() {
+    with_python27 "$GCLOUD --quiet --verbosity warning --project $PROJECT app deploy $1 --version $VERSION"
+}
+
+deploy_full() {
+  for config in app.yaml app-backend-tasks.yaml app-backend-tasks-b2.yaml api.yaml clientapi.yaml tasks.yaml cron.yaml dispatch.yaml index.yaml queue.yaml; do
+    deploy_module $config
+  done
+
+  # Check if we need to deploy our Endpoints config - cleanup afterwards so it's not in our web deploy
+  paver make_endpoints_config
+  if check_deploy_endpoints_config; then
+    with_python27 "$GCLOUD endpoints services deploy tbaMobilev9openapi.json"
+  fi
+  if check_deploy_tbaClient_endpoints_config; then
+    with_python27 "$GCLOUD endpoints services deploy tbaClientv9openapi.json"
+  fi
+}
+
+deploy_single() {
+  deploy_module app.yaml
+  deploy_module index.yaml
+  deploy_module queue.yaml
+
+  # Overwrite files with magic names
+  mv -f ops/standalone/cron-empty.yaml ./cron.yaml
+  mv -f ops/standalone/dispatch-empty.yaml ./dispatch.yaml
+  deploy_module cron.yaml
+  deploy_module dispatch.yaml
+}
+
+deploy_skeleton() {
+  deploy_module app.yaml
+  deploy_module index.yaml
+  deploy_module queue.yaml
+
+  # Overwrite files with magic names
+  mv -f ops/standalone/cron-skeleton.yaml ./cron.yaml
+  mv -f ops/standalone/dispatch-empty.yaml ./dispatch.yaml
+  deploy_module cron.yaml
+  deploy_module dispatch.yaml
 }
 
 # Install the lock release function as a trap so it always runs
@@ -48,7 +91,7 @@ PATH=$PATH:$INSTALL/$NAME/bin/
 echo "Building TBA..."
 paver make
 
-if [ "$TBA_DEPLOY_VERBOSE" = "1"]; then
+if [ "$TBA_DEPLOY_VERBOSE" = "1" ]; then
   echo "Deploying TBA with the following JS modules"
   npm ls || true
 fi
@@ -63,17 +106,22 @@ lock $DEPLOY_LOCK
 echo "Installing trap handler to release deploy lock on exit..."
 trap release_lock EXIT INT TERM
 
-echo "Obtained Lock. Deploying $PROJECT:$VERSION"
-# need more permissions for cron.yaml queue.yaml index.yaml, we can come back to them
-for config in app.yaml app-backend-tasks.yaml app-backend-tasks-b2.yaml api.yaml clientapi.yaml tasks.yaml tbans.yaml cron.yaml dispatch.yaml; do
-    with_python27 "$GCLOUD --quiet --verbosity warning --project $PROJECT app deploy $config --version $VERSION"
-done
-
-# Check if we need to deploy our Endpoints config - cleanup afterwards so it's not in our web deploy
-paver make_endpoints_config
-if check_deploy_endpoints_config; then
-    with_python27 "$GCLOUD endpoints services deploy tbaMobilev9openapi.json"
-fi
+echo "Obtained Lock. Deploying $PROJECT:$VERSION in mode $TBA_DEPLOY_TYPE"
+case "$TBA_DEPLOY_TYPE" in
+  "prod")
+    deploy_full
+    ;;
+  "skeleton")
+    deploy_skeleton
+    ;;
+  "single-instance")
+    deploy_single
+    ;;
+  *)
+    echo "Unknown deploy type $TBA_DEPLOY_TYPE!"
+    exit -1
+    ;;
+esac
 
 echo "Updating build info..."
 update_build_info

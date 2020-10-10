@@ -11,6 +11,7 @@
     "element-resize-event": "^2.0.9",
     "firebase": "^3.6.9",
     "firedux": "^1.1.0",
+    "heatmap.js": "^2.0.5",
     "material-ui": "^0.16.5",
     "prop-types": "^15.5.10",
     "query-string": "^4.1.0",
@@ -32,7 +33,7 @@
     "redux-thunk": "^2.0.1",
     "reselect": "^2.5.1",
     "swagger-client": "3.9.2",
-    "swagger-ui": "3.23.4",
+    "swagger-ui": "^3.24.3",
     "underscore": "^1.8.3"
   },
   "devDependencies": {
@@ -53,9 +54,9 @@
     "gulp-less": "^4.0.1",
     "gulp-rename": "^1.2.2",
     "gulp-sourcemaps": "^1.6.0",
-    "gulp-uglify": "^2.0.0",
+    "gulp-uglify-es": "^2.0.0",
     "jest-cli": "^24.8.0",
-    "less": "^3.9.0",
+    "less": "3.10.3",
     "md5": "^2.2.1",
     "react-addons-test-utils": "^15.3.0",
     "react-test-renderer": "^15.3.0",

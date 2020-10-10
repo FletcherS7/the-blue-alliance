@@ -2,7 +2,6 @@ import logging
 import re
 
 from google.appengine.ext import ndb
-from helpers.champ_split_helper import ChampSplitHelper
 from models.location import Location
 
 
@@ -13,7 +12,7 @@ class Team(ndb.Model):
     """
     team_number = ndb.IntegerProperty(required=True)
     name = ndb.TextProperty(indexed=False)
-    nickname = ndb.StringProperty(indexed=False)
+    nickname = ndb.TextProperty(indexed=False)
     school_name = ndb.TextProperty(indexed=False)
     home_cmp = ndb.StringProperty()
 
@@ -25,11 +24,11 @@ class Team(ndb.Model):
     # Normalized address from the Google Maps API, constructed using the above
     normalized_location = ndb.StructuredProperty(Location)
 
-    website = ndb.StringProperty(indexed=False)
+    website = ndb.TextProperty(indexed=False)
     first_tpid = ndb.IntegerProperty()  # from USFIRST. FIRST team ID number. -greg 5/20/2010
     first_tpid_year = ndb.IntegerProperty()  # from USFIRST. Year tpid is applicable for. -greg 9 Jan 2011
     rookie_year = ndb.IntegerProperty()
-    motto = ndb.StringProperty(indexed=False)
+    motto = ndb.TextProperty(indexed=False)
 
     created = ndb.DateTimeProperty(auto_now_add=True, indexed=False)
     updated = ndb.DateTimeProperty(auto_now=True, indexed=False)
@@ -46,7 +45,12 @@ class Team(ndb.Model):
 
     @property
     def championship_location(self):
-        return ChampSplitHelper.get_champ(self)
+        from models.event import Event
+        if self.home_cmp and self.updated:
+            event = Event.get_by_id("{}{}".format(self.updated.year, self.home_cmp))
+            if event and event.city:
+                return {self.updated.year: event.city}
+        return None
 
     @property
     def location(self):
