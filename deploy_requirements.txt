@@ -19,4 +19,4 @@ google-endpoints==4.8.0
 google-endpoints-api-management==1.11.1
 requests-toolbelt==0.9.1
 # See https://github.com/urllib3/urllib3/issues/1456
-urllib3==1.24.2
+urllib3==1.26.5
